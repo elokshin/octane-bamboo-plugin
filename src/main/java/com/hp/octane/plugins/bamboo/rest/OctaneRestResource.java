@@ -20,6 +20,8 @@ import com.atlassian.bamboo.chains.Chain;
 import com.atlassian.bamboo.plan.PlanManager;
 import com.atlassian.bamboo.security.BambooPermissionManager;
 import com.atlassian.bamboo.security.acegi.acls.BambooPermission;
+import com.atlassian.bamboo.user.BambooUser;
+import com.atlassian.bamboo.user.BambooUserManager;
 import com.atlassian.sal.api.component.ComponentLocator;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hp.octane.integrations.OctaneSDK;
@@ -75,6 +77,10 @@ public class OctaneRestResource {
 				return "Bamboo user name is required";
 			}
 
+			if (!IsUserExist(userName)) {
+				return "Bamboo user does not exist\n";
+			}
+
 			if (!isUserAuthorized(userName)) {
 				return "Bamboo user misconfigured or doesn't have enough permissions\n";
 			}
@@ -103,8 +109,11 @@ public class OctaneRestResource {
 
 		PlanManager planManager = ComponentLocator.getComponent(PlanManager.class);
 		List<Chain> plans = planManager.getAllPlans(Chain.class);
-
-		boolean hasPermission = false;
+		if (plans.isEmpty()) {
+			log.info("Server does not have any plan to run");
+			return true;
+		}
+		boolean hasPermission;
 		for (Chain chain : plans) {
 			hasPermission = isUserHasPermission(BambooPermission.BUILD, userName, chain);
 			if (hasPermission) {
@@ -120,4 +129,12 @@ public class OctaneRestResource {
 		return permissionManager.hasPermission(user, permissionType, chain);
 	}
 
+	private boolean IsUserExist(String userName) {
+		BambooUserManager bambooUserManager = ComponentLocator.getComponent(com.atlassian.bamboo.user.BambooUserManager.class);
+		BambooUser bambooUser = bambooUserManager.loadUserByUsername(userName);
+		if (bambooUser != null) {
+			return true;
+		}
+		return false;
+	}
 }
